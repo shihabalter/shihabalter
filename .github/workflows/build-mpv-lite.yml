@@ -1,0 +1,82 @@
+name: Build MPV Lite Android
+
+on:
+  push:
+    paths:
+      - '.github/workflows/build-mpv-lite.yml'
+      - 'mpv-lite/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.abi }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: armv7l, abi: armeabi-v7a }
+          - { arch: arm64, abi: arm64-v8a }
+          - { arch: x86, abi: x86 }
+          - { arch: x86_64, abi: x86_64 }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install host packages
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y git build-essential autoconf automake libtool pkg-config cmake gperf nasm yasm wget curl unzip zip xz-utils bzip2 gettext autopoint ca-certificates python3 python3-pip
+          python3 -m pip install --user -U meson ninja
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Build ${{ matrix.abi }}
+        run: |
+          chmod +x mpv-lite/build.sh
+          mpv-lite/build.sh '${{ matrix.arch }}'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mpv-lite-${{ matrix.abi }}
+          path: |
+            out/jniLibs/${{ matrix.abi }}/
+            out/16kb-${{ matrix.abi }}.txt
+            out/include/
+          if-no-files-found: error
+          retention-days: 7
+
+  package:
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: mpv-lite-*
+          path: parts
+      - name: Package all ABIs
+        run: |
+          set -euo pipefail
+          mkdir -p final/jniLibs final/reports final/include
+          for abi in armeabi-v7a arm64-v8a x86 x86_64; do
+            src="parts/mpv-lite-$abi"
+            mkdir -p "final/jniLibs/$abi"
+            cp -a "$src/jniLibs/$abi/." "final/jniLibs/$abi/"
+            cp "$src/16kb-$abi.txt" final/reports/
+            [ ! -d "$src/include/mpv" ] || cp -a "$src/include/mpv" final/include/
+          done
+          cat > final/README.txt <<'EOF'
+          MPV Lite Android
+          ABIs: armeabi-v7a, arm64-v8a, x86, x86_64
+          Includes MediaCodec, libass, libplacebo, common codecs/containers/streaming.
+          Lua, FFmpeg programs/devices, obscure decoders and most filters are removed.
+          Every packaged .so passed the 16 KB LOAD-segment alignment check.
+          EOF
+          find final/jniLibs -type f -name '*.so' -printf '%p %k KiB\n' | sort
+          (cd final && zip -9 -r ../mpv-lite-android-all-abis-16kb.zip .)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mpv-lite-android-all-abis-16kb
+          path: mpv-lite-android-all-abis-16kb.zip
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
