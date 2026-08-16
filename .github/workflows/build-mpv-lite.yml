@@ -5,6 +5,8 @@ on:
     paths:
       - '.github/workflows/build-mpv-lite.yml'
       - 'mpv-lite/**'
+  issues:
+    types: [opened]
   workflow_dispatch:
 
 permissions:
@@ -12,6 +14,7 @@ permissions:
 
 jobs:
   build:
+    if: github.event_name != 'issues' || github.event.issue.title == 'Run MPV Lite Build'
     name: Build ${{ matrix.abi }}
     runs-on: ubuntu-24.04
     timeout-minutes: 180
@@ -46,6 +49,7 @@ jobs:
           retention-days: 7
 
   package:
+    if: github.event_name != 'issues' || github.event.issue.title == 'Run MPV Lite Build'
     needs: build
     runs-on: ubuntu-24.04
     steps:
