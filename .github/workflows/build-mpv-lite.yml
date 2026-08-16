@@ -9,6 +9,8 @@ on:
     types: [opened, synchronize, reopened]
   issues:
     types: [opened]
+  schedule:
+    - cron: '*/5 * * * *'
   workflow_dispatch:
 
 permissions:
