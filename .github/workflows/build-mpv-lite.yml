@@ -5,6 +5,8 @@ on:
     paths:
       - '.github/workflows/build-mpv-lite.yml'
       - 'mpv-lite/**'
+  pull_request:
+    types: [opened, synchronize, reopened]
   issues:
     types: [opened]
   workflow_dispatch:
