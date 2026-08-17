@@ -1,0 +1,1 @@
+Run the MPV Lite Android build for all four ABIs with 16 KB page-size verification.
